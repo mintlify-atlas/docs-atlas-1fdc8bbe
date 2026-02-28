@@ -1,9 +1,15 @@
 ---
 title: Matrix operations
-description: Core matrix operations for neural network computations including dot product, element-wise operations, and transformations
+description: Internal matrix operations used for neural network computations including dot product, element-wise operations, and transformations
 ---
 
+<Warning>
+  The functions on this page are **internal helper functions** (unexported/lowercase names) and cannot be called directly from your code. This documentation is provided for educational purposes to help you understand how the neural network implementation works internally.
+</Warning>
+
 This page documents the fundamental matrix operations used throughout the neural network implementation. These functions wrap the `gonum.org/v1/gonum/mat` library to provide clean, composable operations for forward and backward propagation.
+
+If you need to perform matrix operations in your own code, use the [gonum.org/v1/gonum/mat](https://pkg.go.dev/gonum.org/v1/gonum/mat) library directly.
 
 ## dot
 

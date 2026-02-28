@@ -34,11 +34,12 @@ Creates and initializes a new neural network with random weights. The weights ar
 <ResponseField name="net" type="Network">
   A fully initialized neural network ready for training or prediction.
   
-  **Network struct fields:**
-  - `Inputs` (int): Number of input neurons
-  - `Outputs` (int): Number of output neurons
-  - `HiddenWeights` (*mat.Dense): Weight matrix between input and hidden layer
-  - `OutputWeights` (*mat.Dense): Weight matrix between hidden and output layer
+  **Network struct public fields:**
+  - `Inputs` (int): Number of input neurons (read-only after creation)
+  - `Outputs` (int): Number of output neurons (read-only after creation)
+  - `HiddenWeights` (*mat.Dense): Weight matrix between input and hidden layer (200×784 for MNIST)
+  - `OutputWeights` (*mat.Dense): Weight matrix between hidden and output layer (10×200 for MNIST)
+  - `learningRate` (float64): Learning rate used during training (unexported, set at creation)
 </ResponseField>
 
 ## Example
