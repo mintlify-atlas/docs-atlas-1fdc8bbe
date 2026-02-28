@@ -1,0 +1,61 @@
+---
+title: CreateNetwork
+description: Initialize a new neural network with specified architecture and learning rate
+---
+
+## Function signature
+
+```go
+func CreateNetwork(input, hidden, output int, rate float64) (net Network)
+```
+
+Creates and initializes a new neural network with random weights. The weights are initialized using Xavier/He initialization to prevent vanishing or exploding gradients during training.
+
+## Parameters
+
+<ParamField path="input" type="int" required>
+  Number of input neurons. For MNIST digit recognition, this is typically 784 (28x28 pixels).
+</ParamField>
+
+<ParamField path="hidden" type="int" required>
+  Number of neurons in the hidden layer. This is a hyperparameter that affects the network's capacity to learn complex patterns.
+</ParamField>
+
+<ParamField path="output" type="int" required>
+  Number of output neurons. For MNIST classification, this is 10 (digits 0-9).
+</ParamField>
+
+<ParamField path="rate" type="float64" required>
+  Learning rate for gradient descent. Controls how much the weights are adjusted during training. Typical values range from 0.001 to 0.1.
+</ParamField>
+
+## Returns
+
+<ResponseField name="net" type="Network">
+  A fully initialized neural network ready for training or prediction.
+  
+  **Network struct fields:**
+  - `Inputs` (int): Number of input neurons
+  - `Outputs` (int): Number of output neurons
+  - `HiddenWeights` (*mat.Dense): Weight matrix between input and hidden layer
+  - `OutputWeights` (*mat.Dense): Weight matrix between hidden and output layer
+</ResponseField>
+
+## Example
+
+```go
+import "github.com/yangleyland/Go-Neural-Network/internal/perceptron"
+
+// Create network for MNIST digit recognition
+// 784 inputs - 28 x 28 pixels, each pixel is an input
+// 200 hidden neurons - an arbitrary number
+// 10 outputs - digits 0 to 9
+// 0.1 is the learning rate
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+```
+
+## Implementation details
+
+The function initializes weights using a uniform distribution in the range `[-1/sqrt(n), 1/sqrt(n)]`, where `n` is the number of inputs to each layer. This initialization helps prevent gradient problems during training.
+
+Source: `internal/perceptron/perceptron.go:82`

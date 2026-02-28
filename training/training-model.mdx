@@ -1,0 +1,266 @@
+---
+title: Training model
+description: Learn how to train the neural network on MNIST data, configure training parameters, and use the CLI to start training sessions.
+---
+
+The neural network is trained using backpropagation with stochastic gradient descent. This guide covers the training process, hyperparameters, and CLI usage.
+
+## Network architecture
+
+The network is created with the following architecture (cmd/main.go:22-26):
+
+```go
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+```
+
+### Layer configuration
+
+- **Input layer**: 784 neurons (28 x 28 pixels)
+- **Hidden layer**: 200 neurons
+- **Output layer**: 10 neurons (digits 0-9)
+- **Learning rate**: 0.1
+
+<Note>
+The 200 hidden neurons is an arbitrary choice that balances model capacity with training speed. You can modify this in the source code to experiment with different architectures.
+</Note>
+
+## Training configuration
+
+### Epochs
+
+The model trains for **5 epochs** by default (cmd/main.go:57):
+
+```go
+for epochs := 0; epochs < 5; epochs++ {
+    fmt.Println("Epoch ", epochs)
+    // Training loop...
+}
+```
+
+An epoch represents one complete pass through the entire training dataset (60,000 samples).
+
+### Learning rate
+
+The learning rate is set to **0.1** during network initialization. This controls how much the weights are adjusted during each training step.
+
+<Warning>
+Changing the learning rate requires modifying the source code in `cmd/main.go:26`. A higher learning rate (e.g., 0.5) trains faster but may overshoot optimal weights. A lower rate (e.g., 0.01) is more stable but slower.
+</Warning>
+
+## Training process
+
+The training follows these steps for each sample:
+
+<Steps>
+
+### Forward propagation
+
+Input data flows through the network to generate predictions.
+
+### Error calculation
+
+Compare predictions with target values to compute errors.
+
+### Backpropagation
+
+Propagate errors backward through the network to calculate gradients.
+
+### Weight updates
+
+Adjust weights using gradient descent with the learning rate.
+
+</Steps>
+
+### Training algorithm
+
+From internal/perceptron/perceptron.go:30-53:
+
+```go
+func (net *Network) Train(inputData []float64, targetData []float64) {
+    // Forward propagation
+    inputs := mat.NewDense(len(inputData), 1, inputData)
+    hiddenInputs := dot(net.HiddenWeights, inputs)
+    hiddenOutputs := apply(sigmoid, hiddenInputs)
+    finalInputs := dot(net.OutputWeights, hiddenOutputs)
+    finalOutputs := apply(sigmoid, finalInputs)
+
+    // Find errors
+    targets := mat.NewDense(len(targetData), 1, targetData)
+    outputErrors := subtract(targets, finalOutputs)
+    hiddenErrors := dot(net.OutputWeights.T(), outputErrors)
+
+    // Backpropagate
+    net.OutputWeights = add(net.OutputWeights,
+        scale(net.learningRate,
+            dot(multiply(outputErrors, sigmoidPrime(finalOutputs)),
+                hiddenOutputs.T()))).(*mat.Dense)
+
+    net.HiddenWeights = add(net.HiddenWeights,
+        scale(net.learningRate,
+            dot(multiply(hiddenErrors, sigmoidPrime(hiddenOutputs)),
+                inputs.T()))).(*mat.Dense)
+}
+```
+
+## CLI usage
+
+Train the model using the `-mnist` flag:
+
+<CodeGroup>
+
+```bash Training command
+go run cmd/main.go -mnist train
+```
+
+```bash Alternative with build
+go build -o mnist cmd/main.go
+./mnist -mnist train
+```
+
+</CodeGroup>
+
+### Training output
+
+During training, you'll see progress indicators:
+
+```
+Epoch  0
+Epoch  1
+Epoch  2
+Epoch  3
+Epoch  4
+
+Time taken to train: 2m34.5s
+```
+
+The training automatically saves the model weights after completion.
+
+<Note>
+Training time varies based on hardware. On a modern CPU, expect 2-5 minutes for 5 epochs with 60,000 training samples.
+</Note>
+
+## Weight initialization
+
+Weights are randomly initialized using a uniform distribution (internal/perceptron/perceptron.go:69-80):
+
+```go
+func randomArray(size int, v float64) (data []float64) {
+    dist := distuv.Uniform{
+        Min: -1 / math.Sqrt(v),
+        Max: 1 / math.Sqrt(v),
+    }
+
+    data = make([]float64, size)
+    for i := 0; i < size; i++ {
+        data[i] = dist.Rand()
+    }
+    return
+}
+```
+
+This initialization method helps prevent vanishing or exploding gradients during training.
+
+## Activation function
+
+The network uses the **sigmoid activation function** for all layers:
+
+```go
+func sigmoid(r, c int, z float64) float64 {
+    return 1.0 / (1 + math.Exp(-1*z))
+}
+```
+
+### Sigmoid properties
+
+- **Range**: (0, 1)
+- **Smooth gradient**: Enables effective backpropagation
+- **Probabilistic interpretation**: Output values can be interpreted as confidence scores
+
+## Training loop details
+
+The complete training loop from cmd/main.go:53-86:
+
+```go
+func mnistTrain(net *perceptron.Network) {
+    rand.Seed(time.Now().UTC().UnixNano())
+    t1 := time.Now()
+
+    for epochs := 0; epochs < 5; epochs++ {
+        fmt.Println("Epoch ", epochs)
+        testFile, _ := os.Open("mnist_dataset/mnist_train.csv")
+        r := csv.NewReader(bufio.NewReader(testFile))
+        for {
+            record, err := r.Read()
+            if err == io.EOF {
+                break
+            }
+
+            inputs := make([]float64, net.Inputs)
+            for i := range inputs {
+                x, _ := strconv.ParseFloat(record[i], 64)
+                inputs[i] = (x / 255.0 * 0.99) + 0.01
+            }
+
+            targets := make([]float64, 10)
+            for i := range targets {
+                targets[i] = 0.01
+            }
+            x, _ := strconv.Atoi(record[0])
+            targets[x] = 0.99
+
+            net.Train(inputs, targets)
+        }
+        testFile.Close()
+    }
+    elapsed := time.Since(t1)
+    fmt.Printf("\nTime taken to train: %s\n", elapsed)
+}
+```
+
+## Evaluating performance
+
+After training, evaluate the model on test data:
+
+```bash
+go run cmd/main.go -mnist predict
+```
+
+This runs predictions on the test set and displays:
+
+```
+Time taken to check: 15.3s
+score: 9734
+```
+
+A score of 9734 out of 10,000 represents **97.34% accuracy**.
+
+<Note>
+The prediction command requires trained model files (`data/hweights.model` and `data/oweights.model`). Make sure to train the model first or have pre-trained weights available.
+</Note>
+
+## Improving performance
+
+Consider these modifications to enhance training:
+
+- **More epochs**: Increase from 5 to 10-20 epochs for better convergence
+- **Learning rate scheduling**: Reduce learning rate as training progresses
+- **More hidden neurons**: Increase from 200 to 300-500 for higher capacity
+- **Batch processing**: Accumulate gradients across multiple samples before updating
+- **Validation set**: Monitor performance on held-out data to prevent overfitting
+
+<Warning>
+These modifications require source code changes. The current implementation provides a solid baseline with 97% accuracy using the default configuration.
+</Warning>
+
+## Summary
+
+Key training parameters:
+
+- **Architecture**: 784 input → 200 hidden → 10 output neurons
+- **Learning rate**: 0.1
+- **Epochs**: 5
+- **Activation**: Sigmoid function
+- **Training samples**: 60,000 (MNIST train set)
+- **Expected accuracy**: ~97% on test set
+
+Next, learn how to [save and load trained models](/training/saving-loading) for future use.

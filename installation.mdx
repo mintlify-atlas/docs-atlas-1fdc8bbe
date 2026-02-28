@@ -1,0 +1,199 @@
+---
+title: Installation
+description: Set up Go and install the neural network library to get started with MNIST digit classification
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+### Go programming language
+
+This project requires **Go 1.24.3** or later.
+
+<Steps>
+  <Step title="Check if Go is installed">
+    Run the following command to check your Go version:
+    
+    ```bash
+    go version
+    ```
+    
+    If Go is not installed or you need to upgrade, continue to the next step.
+  </Step>
+  
+  <Step title="Install or upgrade Go">
+    Download and install Go from the official website:
+    
+    [https://go.dev/dl/](https://go.dev/dl/)
+    
+    Follow the installation instructions for your operating system.
+  </Step>
+  
+  <Step title="Verify installation">
+    After installation, verify that Go is properly configured:
+    
+    ```bash
+    go version
+    # Should output: go version go1.24.3 or later
+    ```
+  </Step>
+</Steps>
+
+## Clone the repository
+
+Get the source code from GitHub:
+
+```bash
+git clone https://github.com/yangleyland/Go-Neural-Network.git
+cd Go-Neural-Network
+```
+
+## Install dependencies
+
+The project uses the Gonum library for matrix operations. Install all dependencies:
+
+```bash
+go mod download
+```
+
+### Key dependencies
+
+The project requires the following packages (automatically installed via `go mod download`):
+
+- **gonum.org/v1/gonum**: Scientific computing library for matrix operations
+- **golang.org/x/image**: Image processing utilities
+
+<Note>
+  All dependencies are specified in `go.mod` and will be automatically downloaded when you run `go mod download`.
+</Note>
+
+## Get the MNIST dataset
+
+The network trains on the MNIST database of handwritten digits. You need to download the dataset in CSV format.
+
+<Steps>
+  <Step title="Create the dataset directory">
+    ```bash
+    mkdir mnist_dataset
+    ```
+  </Step>
+  
+  <Step title="Download the training data">
+    Download `mnist_train.csv` and place it in the `mnist_dataset` directory.
+    
+    You can get the MNIST dataset in CSV format from:
+    - [Kaggle MNIST Dataset](https://www.kaggle.com/datasets/oddrationale/mnist-in-csv)
+    - [pjreddie.com MNIST CSV](https://pjreddie.com/projects/mnist-in-csv/)
+  </Step>
+  
+  <Step title="Download the test data">
+    Download `mnist_test.csv` and place it in the `mnist_dataset` directory.
+  </Step>
+  
+  <Step title="Verify the dataset structure">
+    Your directory should look like this:
+    
+    ```
+    Go-Neural-Network/
+    ├── mnist_dataset/
+    │   ├── mnist_train.csv
+    │   └── mnist_test.csv
+    ├── cmd/
+    ├── internal/
+    └── ...
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  The MNIST CSV files are large (around 100MB for training data). Make sure you have sufficient disk space and a stable internet connection.
+</Warning>
+
+## Create data directory
+
+The network saves trained model weights to a `data` directory:
+
+```bash
+mkdir -p data
+```
+
+This directory will store:
+- `hweights.model`: Hidden layer weights
+- `oweights.model`: Output layer weights
+
+## Build the project
+
+Compile the Go program:
+
+```bash
+go build -o neural-network cmd/main.go
+```
+
+This creates an executable named `neural-network` in your current directory.
+
+## Verify installation
+
+Confirm that everything is set up correctly:
+
+```bash
+./neural-network -h
+```
+
+You should see the program run without errors (it won't show help text since the implementation doesn't include it, but it will execute successfully).
+
+## Project structure
+
+Here's an overview of the project layout:
+
+```
+Go-Neural-Network/
+├── cmd/
+│   └── main.go              # Main application entry point
+├── internal/
+│   └── perceptron/
+│       └── perceptron.go    # Neural network implementation
+├── mnist_dataset/           # MNIST training and test data
+│   ├── mnist_train.csv
+│   └── mnist_test.csv
+├── data/                    # Saved model weights
+│   ├── hweights.model
+│   └── oweights.model
+├── nums/                    # Custom PNG images for testing
+├── go.mod                   # Go module definition
+└── go.sum                   # Dependency checksums
+```
+
+## Troubleshooting
+
+### Go version mismatch
+
+If you encounter errors about Go version compatibility:
+
+```bash
+go mod edit -go=1.21  # Adjust to your Go version if needed
+go mod tidy
+```
+
+### Missing dependencies
+
+If you see import errors:
+
+```bash
+go mod tidy
+go mod download
+```
+
+### Dataset format issues
+
+Ensure your MNIST CSV files have the correct format:
+- First column: the digit label (0-9)
+- Remaining 784 columns: pixel values (0-255)
+
+## Next steps
+
+Now that you have everything installed, you're ready to train your first neural network:
+
+<Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+  Learn how to train the network and make predictions
+</Card>

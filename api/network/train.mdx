@@ -1,0 +1,110 @@
+---
+title: Train
+description: Train the neural network on a single input-output pair using backpropagation
+---
+
+## Method signature
+
+```go
+func (net *Network) Train(inputData []float64, targetData []float64)
+```
+
+Performs one iteration of training using forward propagation and backpropagation with gradient descent. This method updates the network's weights based on the error between predicted and target outputs.
+
+## Parameters
+
+<ParamField path="inputData" type="[]float64" required>
+  Input feature vector. The length must match the number of input neurons specified when creating the network. Values should be normalized, typically between 0.01 and 1.0.
+</ParamField>
+
+<ParamField path="targetData" type="[]float64" required>
+  Target output vector. The length must match the number of output neurons. For classification tasks, use one-hot encoding (e.g., [0.01, 0.01, 0.99, 0.01, ...] for digit 2).
+</ParamField>
+
+## Returns
+
+This method does not return a value. It modifies the network's weights in-place.
+
+## Example
+
+<CodeGroup>
+
+```go Single training iteration
+import (
+    "github.com/yangleyland/Go-Neural-Network/internal/perceptron"
+)
+
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+
+// Prepare input (normalized pixel values)
+inputs := make([]float64, 784)
+for i := range inputs {
+    pixelValue := 128.0 // example pixel value 0-255
+    inputs[i] = (pixelValue / 255.0 * 0.99) + 0.01
+}
+
+// Prepare target (one-hot encoding for digit 3)
+targets := make([]float64, 10)
+for i := range targets {
+    targets[i] = 0.01
+}
+targets[3] = 0.99
+
+net.Train(inputs, targets)
+```
+
+```go Training loop
+import (
+    "bufio"
+    "encoding/csv"
+    "io"
+    "os"
+    "strconv"
+    "github.com/yangleyland/Go-Neural-Network/internal/perceptron"
+)
+
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+
+// Train for 5 epochs
+for epochs := 0; epochs < 5; epochs++ {
+    testFile, _ := os.Open("mnist_dataset/mnist_train.csv")
+    r := csv.NewReader(bufio.NewReader(testFile))
+    
+    for {
+        record, err := r.Read()
+        if err == io.EOF {
+            break
+        }
+        
+        // Prepare inputs
+        inputs := make([]float64, net.Inputs)
+        for i := range inputs {
+            x, _ := strconv.ParseFloat(record[i], 64)
+            inputs[i] = (x / 255.0 * 0.99) + 0.01
+        }
+        
+        // Prepare targets
+        targets := make([]float64, 10)
+        for i := range targets {
+            targets[i] = 0.01
+        }
+        x, _ := strconv.Atoi(record[0])
+        targets[x] = 0.99
+        
+        net.Train(inputs, targets)
+    }
+    testFile.Close()
+}
+```
+
+</CodeGroup>
+
+## Algorithm
+
+The training process consists of three phases:
+
+1. **Forward propagation**: Computes the network's output by passing inputs through the hidden layer to the output layer using sigmoid activation
+2. **Error calculation**: Computes the difference between predicted outputs and target values, then backpropagates errors to the hidden layer
+3. **Weight updates**: Adjusts weights using gradient descent based on the calculated errors and the configured learning rate
+
+Source: `internal/perceptron/perceptron.go:30`

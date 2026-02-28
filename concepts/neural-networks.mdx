@@ -1,0 +1,126 @@
+---
+title: Neural network architecture
+description: Understanding the three-layer neural network architecture used for MNIST digit classification
+---
+
+## Network structure
+
+This implementation uses a three-layer feedforward neural network specifically designed for MNIST handwritten digit classification:
+
+- **Input layer**: 784 neurons (28×28 pixel images)
+- **Hidden layer**: 200 neurons
+- **Output layer**: 10 neurons (digits 0-9)
+
+<Note>
+The architecture achieves 97% accuracy on the MNIST test dataset after training for 5 epochs.
+</Note>
+
+## Network initialization
+
+The network is created with specific parameters that control its learning behavior:
+
+```go
+// 784 inputs - 28 x 28 pixels, each pixel is an input
+// 200 hidden neurons - an arbitrary number
+// 10 outputs - digits 0 to 9
+// 0.1 is the learning rate
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+```
+
+From `cmd/main.go:26`
+
+### Network struct
+
+The `Network` struct stores all the essential components:
+
+```go
+type Network struct {
+    Inputs        int
+    hiddens       int
+    Outputs       int
+    HiddenWeights *mat.Dense
+    OutputWeights *mat.Dense
+    learningRate  float64
+}
+```
+
+From `internal/perceptron/perceptron.go:11-18`
+
+<Accordion title="Weight matrices dimensions">
+The weight matrices connect each layer:
+
+- **HiddenWeights**: 200×784 matrix (connects 784 inputs to 200 hidden neurons)
+- **OutputWeights**: 10×200 matrix (connects 200 hidden neurons to 10 outputs)
+
+Each weight represents the strength of connection between neurons in adjacent layers.
+</Accordion>
+
+## Weight initialization
+
+Weights are initialized using a uniform random distribution with bounds that scale based on the number of inputs:
+
+```go
+func randomArray(size int, v float64) (data []float64) {
+    dist := distuv.Uniform{
+        Min: -1 / math.Sqrt(v),
+        Max: 1 / math.Sqrt(v),
+    }
+
+    data = make([]float64, size)
+    for i := 0; i < size; i++ {
+        data[i] = dist.Rand()
+    }
+    return
+}
+```
+
+From `internal/perceptron/perceptron.go:69-80`
+
+<Info>
+The weight initialization uses `±1/√n` where `n` is the number of inputs to each layer. This prevents the vanishing/exploding gradient problem by keeping values in a reasonable range.
+</Info>
+
+## Learning rate
+
+The network uses a fixed learning rate of **0.1** throughout training. This hyperparameter controls how much the weights are adjusted during each training iteration:
+
+- **Higher values** (e.g., 0.5): Faster learning but risk overshooting optimal weights
+- **Lower values** (e.g., 0.01): More stable but slower convergence
+- **0.1**: A balanced middle ground for MNIST
+
+## Activation function
+
+The network uses the **sigmoid activation function** for all neurons:
+
+```go
+func sigmoid(r, c int, z float64) float64 {
+    return 1.0 / (1 + math.Exp(-1*z))
+}
+```
+
+From `internal/perceptron/perceptron.go:65-67`
+
+The sigmoid function:
+- Maps any input to a value between 0 and 1
+- Provides smooth, differentiable output for gradient descent
+- Formula: σ(z) = 1 / (1 + e^(-z))
+
+<Accordion title="Why sigmoid for MNIST?">
+Sigmoid activation is well-suited for MNIST because:
+
+1. **Output interpretation**: The 10 output neurons produce values between 0 and 1, easily interpreted as confidence scores
+2. **Smooth gradients**: The derivative is continuous and well-behaved, enabling stable backpropagation
+3. **Binary-like behavior**: Sigmoid naturally separates high confidence (near 1) from low confidence (near 0)
+
+Modern networks often use ReLU, but sigmoid works effectively for this relatively simple classification task.
+</Accordion>
+
+## Why 200 hidden neurons?
+
+The choice of 200 hidden neurons is a design decision that balances:
+
+- **Representational capacity**: Enough neurons to learn complex patterns in handwritten digits
+- **Computational efficiency**: Not so many that training becomes prohibitively slow
+- **Overfitting prevention**: Fewer parameters than the extreme case reduces memorization risk
+
+This architecture has `(784 × 200) + (200 × 10) = 158,800` total trainable weights.

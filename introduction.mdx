@@ -1,0 +1,116 @@
+---
+title: Go Neural Network
+description: A neural network implementation from scratch in Go for MNIST handwritten digit classification with 97% accuracy
+---
+
+## Overview
+
+This is a fully-featured neural network built from scratch in Go, designed to classify handwritten digits from the MNIST dataset. The implementation uses no high-level machine learning frameworks, instead building the network using matrix operations from the Gonum library.
+
+The network achieves **97% accuracy** on the MNIST test set, demonstrating that simple feedforward networks can still be highly effective for image classification tasks.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Pure Go implementation" icon="code">
+    Built entirely in Go without machine learning frameworks, using only Gonum for matrix operations
+  </Card>
+  <Card title="High accuracy" icon="bullseye">
+    Achieves 97% accuracy on MNIST handwritten digit classification
+  </Card>
+  <Card title="Simple architecture" icon="diagram-project">
+    Three-layer network: 784 inputs, 200 hidden neurons, 10 outputs
+  </Card>
+  <Card title="Fast training" icon="bolt">
+    Efficient backpropagation implementation with adjustable learning rate
+  </Card>
+</CardGroup>
+
+## Network architecture
+
+The neural network uses a straightforward three-layer architecture:
+
+- **Input layer**: 784 neurons (28×28 pixel images flattened)
+- **Hidden layer**: 200 neurons with sigmoid activation
+- **Output layer**: 10 neurons (digits 0-9) with sigmoid activation
+
+The network is trained using backpropagation with gradient descent, implementing the following:
+
+- Sigmoid activation function
+- Forward propagation for predictions
+- Backpropagation for weight updates
+- Adjustable learning rate (default: 0.1)
+
+## Quick links
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Get started by installing Go and cloning the repository
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Train your first model and make predictions in minutes
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/network/create-network">
+    Explore the Network API and helper functions
+  </Card>
+</CardGroup>
+
+## How it works
+
+The implementation consists of two main components:
+
+### 1. Network structure
+
+The `Network` struct in `internal/perceptron/perceptron.go` contains:
+
+```go
+type Network struct {
+    Inputs        int
+    hiddens       int
+    Outputs       int
+    HiddenWeights *mat.Dense
+    OutputWeights *mat.Dense
+    learningRate  float64
+}
+```
+
+### 2. Training and prediction
+
+The network provides two core methods:
+
+- **Train()**: Performs forward propagation, calculates errors, and updates weights using backpropagation
+- **Predict()**: Runs forward propagation to generate predictions for new inputs
+
+<Note>
+  The network normalizes all pixel values to a range of 0.01-1.0 to improve training stability.
+</Note>
+
+## Use cases
+
+This neural network is perfect for:
+
+- Learning how neural networks work under the hood
+- Understanding backpropagation and gradient descent
+- Building custom digit recognition systems
+- Educational purposes and experimentation
+- Baseline for comparing more complex architectures
+
+## Next steps
+
+<Steps>
+  <Step title="Install dependencies">
+    Set up Go and download the MNIST dataset
+    
+    [Installation guide →](/installation)
+  </Step>
+  <Step title="Run your first training">
+    Train the network on MNIST and evaluate its accuracy
+    
+    [Quickstart tutorial →](/quickstart)
+  </Step>
+  <Step title="Make predictions">
+    Use the trained model to classify your own handwritten digits
+    
+    [See prediction examples →](/quickstart#making-predictions)
+  </Step>
+</Steps>

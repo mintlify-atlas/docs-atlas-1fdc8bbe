@@ -1,0 +1,154 @@
+---
+title: Predict
+description: Generate predictions from the trained neural network
+---
+
+## Method signature
+
+```go
+func (net Network) Predict(inputData []float64) mat.Matrix
+```
+
+Performs forward propagation through the network to generate predictions for the given input. This method does not modify the network's weights.
+
+## Parameters
+
+<ParamField path="inputData" type="[]float64" required>
+  Input feature vector. The length must match the number of input neurons specified when creating the network. Values should be normalized using the same method used during training (typically between 0.01 and 1.0).
+</ParamField>
+
+## Returns
+
+<ResponseField name="output" type="mat.Matrix">
+  A matrix containing the network's output predictions. The dimensions are `(outputs × 1)`, where each row represents the confidence for a particular class. Values are between 0 and 1 due to sigmoid activation.
+  
+  For classification tasks, the predicted class is the index with the highest value.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```go Single prediction
+import (
+    "fmt"
+    "github.com/yangleyland/Go-Neural-Network/internal/perceptron"
+)
+
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+// ... train the network or load trained weights ...
+
+// Prepare input
+inputs := make([]float64, 784)
+for i := range inputs {
+    pixelValue := 128.0 // example pixel value 0-255
+    inputs[i] = (pixelValue / 255.0 * 0.99) + 0.01
+}
+
+// Get predictions
+outputs := net.Predict(inputs)
+
+// Find the predicted digit
+best := 0
+highest := 0.0
+for i := 0; i < net.Outputs; i++ {
+    if outputs.At(i, 0) > highest {
+        best = i
+        highest = outputs.At(i, 0)
+    }
+}
+fmt.Println("Predicted digit:", best)
+```
+
+```go Batch prediction with accuracy
+import (
+    "bufio"
+    "encoding/csv"
+    "fmt"
+    "io"
+    "os"
+    "strconv"
+    "github.com/yangleyland/Go-Neural-Network/internal/perceptron"
+)
+
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+// ... load trained weights ...
+
+checkFile, _ := os.Open("mnist_dataset/mnist_test.csv")
+defer checkFile.Close()
+
+score := 0
+r := csv.NewReader(bufio.NewReader(checkFile))
+for {
+    record, err := r.Read()
+    if err == io.EOF {
+        break
+    }
+    
+    inputs := make([]float64, net.Inputs)
+    for i := range inputs {
+        x, _ := strconv.ParseFloat(record[i], 64)
+        inputs[i] = (x / 255.0 * 0.99) + 0.01
+    }
+    
+    outputs := net.Predict(inputs)
+    
+    best := 0
+    highest := 0.0
+    for i := 0; i < net.Outputs; i++ {
+        if outputs.At(i, 0) > highest {
+            best = i
+            highest = outputs.At(i, 0)
+        }
+    }
+    
+    target, _ := strconv.Atoi(record[0])
+    if best == target {
+        score++
+    }
+}
+
+fmt.Println("Accuracy score:", score)
+```
+
+```go Predict from image
+import (
+    "fmt"
+    "github.com/yangleyland/Go-Neural-Network/internal/perceptron"
+)
+
+func predictFromImage(net perceptron.Network, path string) int {
+    input := dataFromImage(path) // converts 28x28 PNG to []float64
+    output := net.Predict(input)
+    
+    perceptron.MatrixPrint(output)
+    
+    best := 0
+    highest := 0.0
+    for i := 0; i < net.Outputs; i++ {
+        if output.At(i, 0) > highest {
+            best = i
+            highest = output.At(i, 0)
+        }
+    }
+    return best
+}
+
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+// ... load trained weights ...
+
+prediction := predictFromImage(net, "digit.png")
+fmt.Println("Predicted digit:", prediction)
+```
+
+</CodeGroup>
+
+## Algorithm
+
+The prediction process uses forward propagation:
+
+1. Input values are multiplied by hidden layer weights and passed through sigmoid activation
+2. Hidden layer outputs are multiplied by output layer weights and passed through sigmoid activation
+3. Final outputs represent confidence scores for each class (0-1 range)
+
+Source: `internal/perceptron/perceptron.go:55`

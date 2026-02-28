@@ -1,0 +1,198 @@
+---
+title: MNIST dataset
+description: How the MNIST handwritten digit dataset is formatted, loaded, and preprocessed for neural network training
+---
+
+## Dataset overview
+
+The MNIST (Modified National Institute of Standards and Technology) database contains:
+
+- **Training set**: 60,000 handwritten digit images
+- **Test set**: 10,000 handwritten digit images
+- **Image size**: 28×28 pixels (grayscale)
+- **Classes**: 10 digits (0-9)
+
+<Info>
+This implementation uses CSV versions of the MNIST dataset located in `mnist_dataset/mnist_train.csv` and `mnist_dataset/mnist_test.csv`.
+</Info>
+
+## CSV format
+
+Each row in the CSV file represents one image:
+
+```
+label,pixel0,pixel1,pixel2,...,pixel783
+5,0,0,0,...,0,0
+0,0,0,0,...,0,0
+4,0,0,0,...,0,0
+```
+
+- **First column**: The actual digit label (0-9)
+- **Remaining 784 columns**: Pixel values (0-255) in row-major order
+
+## Data loading
+
+The training process reads the CSV file and processes each record:
+
+```go
+func mnistTrain(net *perceptron.Network) {
+    rand.Seed(time.Now().UTC().UnixNano())
+    t1 := time.Now()
+
+    for epochs := 0; epochs < 5; epochs++ {
+        fmt.Println("Epoch ", epochs)
+        testFile, _ := os.Open("mnist_dataset/mnist_train.csv")
+        r := csv.NewReader(bufio.NewReader(testFile))
+        for {
+            record, err := r.Read()
+            if err == io.EOF {
+                break
+            }
+            // ... process each record
+        }
+        testFile.Close()
+    }
+}
+```
+
+From `cmd/main.go:53-86`
+
+<Note>
+The network trains for **5 epochs**, meaning it processes the entire 60,000-image training set 5 times. Each pass through the dataset refines the weights further.
+</Note>
+
+## Input normalization
+
+Raw pixel values (0-255) are normalized to a range of approximately 0.01 to 1.0:
+
+```go
+inputs := make([]float64, net.Inputs)
+for i := range inputs {
+    x, _ := strconv.ParseFloat(record[i], 64)
+    inputs[i] = (x / 255.0 * 0.99) + 0.01
+}
+```
+
+From `cmd/main.go:67-71`
+
+### Normalization formula
+
+```
+normalized_value = (pixel_value / 255.0 × 0.99) + 0.01
+```
+
+<Accordion title="Why normalize to 0.01-1.0 instead of 0-1?">
+The normalization avoids exact 0 and 1 values for two reasons:
+
+1. **Numerical stability**: The sigmoid function's derivative approaches zero at extreme values, causing very small gradients that slow learning
+2. **Avoiding saturation**: Inputs of exactly 0 would cause some neurons to never activate, while inputs of exactly 1 could oversaturate them
+
+The range 0.01-1.0 keeps neurons in their responsive region while maintaining the relative differences between dark and light pixels.
+</Accordion>
+
+## Target encoding (one-hot)
+
+The label is converted to a one-hot encoded vector:
+
+```go
+targets := make([]float64, 10)
+for i := range targets {
+    targets[i] = 0.01
+}
+x, _ := strconv.Atoi(record[0])
+targets[x] = 0.99
+```
+
+From `cmd/main.go:73-78`
+
+### Example encoding
+
+For digit **5**, the target vector is:
+
+```
+[0.01, 0.01, 0.01, 0.01, 0.01, 0.99, 0.01, 0.01, 0.01, 0.01]
+```
+
+<Info>
+Like the inputs, targets use 0.01 and 0.99 instead of 0 and 1 to avoid saturation. The network aims to output 0.99 for the correct digit and 0.01 for all others.
+</Info>
+
+## Image input processing
+
+For making predictions on custom PNG images:
+
+```go
+func dataFromImage(filePath string) (pixels []float64) {
+    imgFile, _ := os.Open(filePath)
+    defer imgFile.Close()
+    img, _ := png.Decode(imgFile)
+
+    // create a grayscale image
+    bounds := img.Bounds()
+    gray := image.NewGray(bounds)
+
+    for x := 0; x < bounds.Max.X; x++ {
+        for y := 0; y < bounds.Max.Y; y++ {
+            rgba := img.At(x, y)
+            gray.Set(x, y, rgba)
+        }
+    }
+    // make a pixel array
+    pixels = make([]float64, len(gray.Pix))
+    // populate the pixel array subtract Pix from 255 because
+    // that's how the MNIST database was trained (in reverse)
+    for i := 0; i < len(gray.Pix); i++ {
+        pixels[i] = (float64(255-gray.Pix[i]) / 255.0 * 0.99) + 0.01
+    }
+    return
+}
+```
+
+From `cmd/main.go:173-203`
+
+<Note>
+**Important**: Pixel values are inverted (`255 - gray.Pix[i]`) because MNIST images have white digits on black backgrounds, but PNG images typically have black digits on white backgrounds.
+</Note>
+
+## Prediction process
+
+During prediction, the network outputs are compared to find the highest confidence:
+
+```go
+outputs := net.Predict(inputs)
+best := 0
+highest := 0.0
+for i := 0; i < net.Outputs; i++ {
+    if outputs.At(i, 0) > highest {
+        best = i
+        highest = outputs.At(i, 0)
+    }
+}
+```
+
+From `cmd/main.go:108-116`
+
+The predicted digit is the index of the output neuron with the highest activation value.
+
+## Performance metrics
+
+The testing phase evaluates accuracy:
+
+```go
+func mnistPredict(net *perceptron.Network) {
+    score := 0
+    // ... read test data
+    for {
+        // ... process record and predict
+        target, _ := strconv.Atoi(record[0])
+        if best == target {
+            score++
+        }
+    }
+    fmt.Println("score:", score)
+}
+```
+
+From `cmd/main.go:88-126`
+
+With 5 epochs of training, this network achieves approximately **9,700 correct predictions out of 10,000 test images** (97% accuracy).

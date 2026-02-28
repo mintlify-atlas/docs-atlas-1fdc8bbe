@@ -1,0 +1,202 @@
+---
+title: Forward propagation
+description: How the neural network computes predictions by propagating inputs through layers using matrix operations and activation functions
+---
+
+## Overview
+
+Forward propagation is the process of computing the network's output by passing inputs through each layer, applying weights and activation functions along the way.
+
+<Info>
+This implementation uses forward propagation in both training (to compute predictions before backpropagation) and inference (to make predictions on new data).
+</Info>
+
+## The prediction algorithm
+
+Here's the complete forward propagation implementation:
+
+```go
+func (net Network) Predict(inputData []float64) mat.Matrix {
+    // forward propagation
+    inputs := mat.NewDense(len(inputData), 1, inputData)
+    hiddenInputs := dot(net.HiddenWeights, inputs)
+    hiddenOutputs := apply(sigmoid, hiddenInputs)
+    finalInputs := dot(net.OutputWeights, hiddenOutputs)
+    finalOutputs := apply(sigmoid, finalInputs)
+    return finalOutputs
+}
+```
+
+From `internal/perceptron/perceptron.go:55-63`
+
+## Step-by-step process
+
+### Step 1: Format input
+
+```go
+inputs := mat.NewDense(len(inputData), 1, inputData)
+```
+
+The 784 normalized pixel values are converted into a column vector (784×1 matrix).
+
+### Step 2: Compute hidden layer inputs
+
+```go
+hiddenInputs := dot(net.HiddenWeights, inputs)
+```
+
+This performs matrix multiplication: **HiddenWeights × inputs**
+
+- HiddenWeights: 200×784 matrix
+- inputs: 784×1 vector
+- Result: 200×1 vector (one value per hidden neuron)
+
+<Accordion title="Mathematical details">
+For each hidden neuron `j`, the input is computed as:
+
+```
+hiddenInput[j] = Σ(w[j,i] × input[i]) for i = 0 to 783
+```
+
+This is the weighted sum of all input pixels for that hidden neuron. Each hidden neuron has its own set of 784 weights, forming one row of the HiddenWeights matrix.
+</Accordion>
+
+### Step 3: Apply activation to hidden layer
+
+```go
+hiddenOutputs := apply(sigmoid, hiddenInputs)
+```
+
+The sigmoid function is applied element-wise to each hidden neuron's input:
+
+```go
+func sigmoid(r, c int, z float64) float64 {
+    return 1.0 / (1 + math.Exp(-1*z))
+}
+```
+
+From `internal/perceptron/perceptron.go:65-67`
+
+This produces a 200×1 vector of activated values (each between 0 and 1).
+
+### Step 4: Compute output layer inputs
+
+```go
+finalInputs := dot(net.OutputWeights, hiddenOutputs)
+```
+
+Another matrix multiplication: **OutputWeights × hiddenOutputs**
+
+- OutputWeights: 10×200 matrix
+- hiddenOutputs: 200×1 vector
+- Result: 10×1 vector (one value per output neuron)
+
+### Step 5: Apply activation to output layer
+
+```go
+finalOutputs := apply(sigmoid, finalInputs)
+```
+
+Sigmoid is applied again, producing the final 10×1 output vector. Each value represents the network's confidence that the input image is that particular digit.
+
+<Note>
+For example, if output[5] = 0.95 and all other outputs are < 0.2, the network is highly confident the digit is 5.
+</Note>
+
+## Matrix operations
+
+### Dot product (matrix multiplication)
+
+```go
+func dot(m, n mat.Matrix) mat.Matrix {
+    r, _ := m.Dims()
+    _, c := n.Dims()
+    o := mat.NewDense(r, c, nil)
+    o.Product(m, n)
+    return o
+}
+```
+
+From `internal/perceptron/perceptron.go:95-101`
+
+### Applying activation functions
+
+```go
+func apply(fn func(i, j int, v float64) float64, m mat.Matrix) mat.Matrix {
+    r, c := m.Dims()
+    o := mat.NewDense(r, c, nil)
+    o.Apply(fn, m)
+    return o
+}
+```
+
+From `internal/perceptron/perceptron.go:103-108`
+
+The `apply` function takes a function and applies it element-wise to every value in the matrix.
+
+## Data flow visualization
+
+```
+Input Layer (784 neurons)
+    ↓
+    ↓ × HiddenWeights (200×784)
+    ↓
+Weighted Sums (200 values)
+    ↓
+    ↓ sigmoid activation
+    ↓
+Hidden Layer (200 neurons)
+    ↓
+    ↓ × OutputWeights (10×200)
+    ↓
+Weighted Sums (10 values)
+    ↓
+    ↓ sigmoid activation
+    ↓
+Output Layer (10 neurons)
+```
+
+## Forward propagation in training
+
+The same forward propagation logic appears in the training method:
+
+```go
+func (net *Network) Train(inputData []float64, targetData []float64) {
+    // forward propagation
+    inputs := mat.NewDense(len(inputData), 1, inputData)
+    hiddenInputs := dot(net.HiddenWeights, inputs)
+    hiddenOutputs := apply(sigmoid, hiddenInputs)
+    finalInputs := dot(net.OutputWeights, hiddenOutputs)
+    finalOutputs := apply(sigmoid, finalInputs)
+
+    // find errors
+    // ... (backpropagation continues)
+}
+```
+
+From `internal/perceptron/perceptron.go:30-36`
+
+<Info>
+During training, forward propagation computes the prediction first, then backpropagation adjusts weights based on the error. During inference, only forward propagation is needed.
+</Info>
+
+## Computational complexity
+
+The forward pass involves:
+
+1. **Hidden layer**: 784 × 200 = 156,800 multiplications
+2. **Sigmoid (hidden)**: 200 exponential operations
+3. **Output layer**: 200 × 10 = 2,000 multiplications
+4. **Sigmoid (output)**: 10 exponential operations
+
+**Total**: ~159,000 operations per prediction
+
+<Accordion title="Why this is fast">
+Despite ~159,000 operations per image, forward propagation is fast because:
+
+1. **Matrix operations**: Modern libraries like Gonum use optimized BLAS (Basic Linear Algebra Subprograms) routines
+2. **Cache efficiency**: Matrix multiplication has good memory locality
+3. **No branching**: The computation is purely arithmetic with no conditional logic
+
+On modern hardware, the network can process thousands of images per second.
+</Accordion>

@@ -1,0 +1,159 @@
+---
+title: Matrix utilities
+description: Utility functions for matrix visualization, activation functions, and weight initialization
+---
+
+This page documents helper functions used for debugging, activation, and initialization in the neural network implementation.
+
+## MatrixPrint
+
+Pretty prints a Gonum matrix to the console for debugging and visualization.
+
+```go
+func MatrixPrint(X mat.Matrix)
+```
+
+<ParamField path="X" type="mat.Matrix" required>
+  The matrix to print to the console
+</ParamField>
+
+### Usage example
+
+```go
+// Print network predictions
+predictions := net.Predict(inputData)
+MatrixPrint(predictions)
+
+// Output:
+// ⎡0.0234⎤
+// ⎢0.9821⎥
+// ⎢0.0123⎥
+// ⎣ ... ⎦
+```
+
+<Info>
+  This function uses `mat.Formatted` with `Prefix("")` and `Squeeze()` options to create compact, readable matrix output suitable for terminal display.
+</Info>
+
+## sigmoid
+
+The sigmoid activation function that maps any input value to a range between 0 and 1.
+
+```go
+func sigmoid(r, c int, z float64) float64
+```
+
+<ParamField path="r" type="int" required>
+  Row index (required by `apply` function signature, not used in computation)
+</ParamField>
+
+<ParamField path="c" type="int" required>
+  Column index (required by `apply` function signature, not used in computation)
+</ParamField>
+
+<ParamField path="z" type="float64" required>
+  The input value to transform
+</ParamField>
+
+<ParamField path="returns" type="float64">
+  The sigmoid output: 1 / (1 + e^(-z))
+</ParamField>
+
+### Mathematical definition
+
+The sigmoid function is defined as:
+
+```
+σ(z) = 1 / (1 + e^(-z))
+```
+
+Key properties:
+- Output range: (0, 1)
+- Smooth, differentiable curve
+- Output approaches 0 for large negative inputs
+- Output approaches 1 for large positive inputs
+- Output equals 0.5 when input is 0
+
+### Usage in neural network
+
+<CodeGroup>
+```go Forward propagation
+// Apply sigmoid to hidden layer
+hiddenOutputs := apply(sigmoid, hiddenInputs)
+
+// Apply sigmoid to output layer
+finalOutputs := apply(sigmoid, finalInputs)
+```
+
+```go Used with apply function
+// The signature matches apply's function parameter:
+// func(i, j int, v float64) float64
+apply(sigmoid, matrix)
+```
+</CodeGroup>
+
+<Info>
+  The sigmoid function introduces non-linearity into the network, allowing it to learn complex decision boundaries. For MNIST classification, the output layer uses sigmoid to produce probability-like values for each digit class (0-9).
+</Info>
+
+## randomArray
+
+Generates an array of random floating-point values drawn from a uniform distribution, used for weight initialization.
+
+```go
+func randomArray(size int, v float64) (data []float64)
+```
+
+<ParamField path="size" type="int" required>
+  The number of random values to generate
+</ParamField>
+
+<ParamField path="v" type="float64" required>
+  The variance parameter used to calculate distribution bounds
+</ParamField>
+
+<ParamField path="returns" type="[]float64">
+  A slice of `size` random values uniformly distributed between -1/√v and 1/√v
+</ParamField>
+
+### Distribution details
+
+The function creates a uniform distribution with:
+- **Minimum**: `-1 / √v`
+- **Maximum**: `1 / √v`
+
+This range is based on Xavier initialization principles, where weights are scaled by the square root of the number of input connections to maintain stable gradients during training.
+
+### Usage in neural network
+
+Called during network creation to initialize weight matrices:
+
+```go
+// Initialize hidden layer weights
+net.HiddenWeights = mat.NewDense(
+    net.hiddens,
+    net.Inputs,
+    randomArray(net.Inputs*net.hiddens, float64(net.Inputs)),
+)
+
+// Initialize output layer weights
+net.OutputWeights = mat.NewDense(
+    net.Outputs,
+    net.hiddens,
+    randomArray(net.hiddens*net.Outputs, float64(net.hiddens)),
+)
+```
+
+<Info>
+  Proper weight initialization is critical for training success. Random values break symmetry (preventing all neurons from learning the same features), while the scaled range prevents vanishing or exploding gradients. The variance parameter `v` is set to the number of input connections for each layer.
+</Info>
+
+### Example
+
+```go
+// Generate 12 random weights for a layer with 3 inputs and 4 neurons
+weights := randomArray(12, 3.0)
+
+// Values will be in range [-1/√3, 1/√3] ≈ [-0.577, 0.577]
+// Example output: [0.234, -0.421, 0.156, -0.089, ...]
+```

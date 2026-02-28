@@ -1,0 +1,287 @@
+---
+title: Backpropagation
+description: How the neural network learns by computing gradients and updating weights using the backpropagation algorithm
+---
+
+## Overview
+
+Backpropagation is the algorithm that enables neural networks to learn. It computes how much each weight contributed to the error, then adjusts weights to reduce that error.
+
+<Info>
+This implementation uses gradient descent with backpropagation to minimize the difference between predicted and target outputs.
+</Info>
+
+## The training algorithm
+
+Here's the complete training implementation:
+
+```go
+func (net *Network) Train(inputData []float64, targetData []float64) {
+    // forward propagation
+    inputs := mat.NewDense(len(inputData), 1, inputData)
+    hiddenInputs := dot(net.HiddenWeights, inputs)
+    hiddenOutputs := apply(sigmoid, hiddenInputs)
+    finalInputs := dot(net.OutputWeights, hiddenOutputs)
+    finalOutputs := apply(sigmoid, finalInputs)
+
+    // find errors
+    targets := mat.NewDense(len(targetData), 1, targetData)
+    outputErrors := subtract(targets, finalOutputs)
+    hiddenErrors := dot(net.OutputWeights.T(), outputErrors)
+
+    // backpropagate
+    net.OutputWeights = add(net.OutputWeights,
+        scale(net.learningRate,
+            dot(multiply(outputErrors, sigmoidPrime(finalOutputs)),
+                hiddenOutputs.T()))).(*mat.Dense)
+
+    net.HiddenWeights = add(net.HiddenWeights,
+        scale(net.learningRate,
+            dot(multiply(hiddenErrors, sigmoidPrime(hiddenOutputs)),
+                inputs.T()))).(*mat.Dense)
+}
+```
+
+From `internal/perceptron/perceptron.go:30-53`
+
+## Step-by-step process
+
+### Phase 1: Forward propagation
+
+First, compute the network's prediction using forward propagation (see [forward propagation](/concepts/forward-propagation) for details).
+
+### Phase 2: Compute output errors
+
+```go
+targets := mat.NewDense(len(targetData), 1, targetData)
+outputErrors := subtract(targets, finalOutputs)
+```
+
+From `internal/perceptron/perceptron.go:39-40`
+
+The error is simply the difference between what we wanted (targets) and what we got (finalOutputs).
+
+**Example**: If the image is digit 5:
+- Target: `[0.01, 0.01, 0.01, 0.01, 0.01, 0.99, 0.01, 0.01, 0.01, 0.01]`
+- Actual: `[0.05, 0.02, 0.03, 0.01, 0.04, 0.78, 0.02, 0.01, 0.03, 0.01]`
+- Error: `[-0.04, -0.01, -0.02, 0.00, -0.03, 0.21, -0.01, 0.00, -0.02, 0.00]`
+
+Positive error means we need to increase that output; negative means decrease.
+
+### Phase 3: Propagate errors backward
+
+```go
+hiddenErrors := dot(net.OutputWeights.T(), outputErrors)
+```
+
+From `internal/perceptron/perceptron.go:41`
+
+This calculates how much each hidden neuron contributed to the output error by:
+1. Taking the transpose of OutputWeights (10×200 becomes 200×10)
+2. Multiplying by outputErrors (10×1)
+3. Result: 200×1 vector of hidden layer errors
+
+<Accordion title="Why multiply by the transpose?">
+The transpose operation reverses the direction of information flow:
+
+- **Forward pass**: Hidden neurons → Output neurons (using OutputWeights)
+- **Backward pass**: Output errors → Hidden errors (using OutputWeights.T())
+
+This distributes each output error back to the hidden neurons that fed into it, weighted by the connection strengths.
+</Accordion>
+
+### Phase 4: Compute weight gradients (output layer)
+
+```go
+net.OutputWeights = add(net.OutputWeights,
+    scale(net.learningRate,
+        dot(multiply(outputErrors, sigmoidPrime(finalOutputs)),
+            hiddenOutputs.T()))).(*mat.Dense)
+```
+
+From `internal/perceptron/perceptron.go:44-47`
+
+This updates the output weights using the gradient descent formula:
+
+```
+ΔWeight = learningRate × error × sigmoid'(output) × input
+```
+
+Breaking it down:
+1. `sigmoidPrime(finalOutputs)`: Compute sigmoid derivative
+2. `multiply(outputErrors, sigmoidPrime(...))`: Error weighted by gradient
+3. `dot(..., hiddenOutputs.T())`: Multiply by hidden layer activations
+4. `scale(net.learningRate, ...)`: Scale by learning rate (0.1)
+5. `add(net.OutputWeights, ...)`: Add the change to existing weights
+
+### Phase 5: Compute weight gradients (hidden layer)
+
+```go
+net.HiddenWeights = add(net.HiddenWeights,
+    scale(net.learningRate,
+        dot(multiply(hiddenErrors, sigmoidPrime(hiddenOutputs)),
+            inputs.T()))).(*mat.Dense)
+```
+
+From `internal/perceptron/perceptron.go:49-52`
+
+The same formula applies to hidden weights, using hiddenErrors and inputs instead.
+
+## Sigmoid derivative
+
+The derivative of sigmoid is crucial for backpropagation:
+
+```go
+func sigmoidPrime(m mat.Matrix) mat.Matrix {
+    rows, _ := m.Dims()
+    o := make([]float64, rows)
+    for i := range o {
+        o[i] = 1
+    }
+    ones := mat.NewDense(rows, 1, o)
+    return multiply(m, subtract(ones, m)) // m * (1 - m)
+}
+```
+
+From `internal/perceptron/perceptron.go:20-28`
+
+### Mathematical formula
+
+For sigmoid σ(z) = 1 / (1 + e^(-z)), the derivative is:
+
+```
+σ'(z) = σ(z) × (1 - σ(z))
+```
+
+<Note>
+This elegant formula means we can compute the derivative using only the sigmoid's output value, without needing to recalculate the exponential.
+</Note>
+
+<Accordion title="Why the derivative matters">
+The derivative tells us:
+
+1. **Direction**: Should we increase or decrease the weight?
+2. **Magnitude**: How much should we change it?
+
+At sigmoid values near 0.5, the derivative is highest (~0.25), meaning gradients flow well. Near 0 or 1, the derivative approaches 0, causing the "vanishing gradient" problem where learning slows down.
+</Accordion>
+
+## Weight update formula
+
+The general weight update rule for gradient descent:
+
+```
+W_new = W_old + α × δ × a
+```
+
+Where:
+- **W**: Weight matrix
+- **α**: Learning rate (0.1)
+- **δ**: Error × sigmoid'(output) (the "delta")
+- **a**: Activation from previous layer
+
+## Matrix operation helpers
+
+### Element-wise multiplication
+
+```go
+func multiply(m, n mat.Matrix) mat.Matrix {
+    r, c := m.Dims()
+    o := mat.NewDense(r, c, nil)
+    o.MulElem(m, n)
+    return o
+}
+```
+
+From `internal/perceptron/perceptron.go:117-122`
+
+Multiplies corresponding elements (not matrix multiplication).
+
+### Scalar multiplication
+
+```go
+func scale(s float64, m mat.Matrix) mat.Matrix {
+    r, c := m.Dims()
+    o := mat.NewDense(r, c, nil)
+    o.Scale(s, m)
+    return o
+}
+```
+
+From `internal/perceptron/perceptron.go:110-115`
+
+Multiplies every element by the learning rate.
+
+### Matrix subtraction
+
+```go
+func subtract(m, n mat.Matrix) mat.Matrix {
+    r, c := m.Dims()
+    o := mat.NewDense(r, c, nil)
+    o.Sub(m, n)
+    return o
+}
+```
+
+From `internal/perceptron/perceptron.go:131-136`
+
+Computes element-wise difference for error calculation.
+
+## Training loop
+
+The network trains on all 60,000 images, 5 times:
+
+```go
+for epochs := 0; epochs < 5; epochs++ {
+    fmt.Println("Epoch ", epochs)
+    testFile, _ := os.Open("mnist_dataset/mnist_train.csv")
+    r := csv.NewReader(bufio.NewReader(testFile))
+    for {
+        record, err := r.Read()
+        if err == io.EOF {
+            break
+        }
+        // ... prepare inputs and targets
+        net.Train(inputs, targets)
+    }
+    testFile.Close()
+}
+```
+
+From `cmd/main.go:57-82`
+
+<Info>
+Each call to `Train()` adjusts the weights slightly. After 300,000 training iterations (60,000 images × 5 epochs), the weights converge to values that achieve 97% accuracy.
+</Info>
+
+## Gradient descent visualization
+
+```
+Iteration 1: Error = 0.45 → Adjust weights → New error = 0.42
+Iteration 2: Error = 0.42 → Adjust weights → New error = 0.38
+Iteration 3: Error = 0.38 → Adjust weights → New error = 0.35
+...
+Iteration 300,000: Error ≈ 0.03 → High accuracy achieved
+```
+
+Each weight update moves the network slightly toward lower error. Over thousands of iterations, this hill-climbing process finds weight values that accurately classify digits.
+
+## Why backpropagation works
+
+Backpropagation is efficient because:
+
+1. **Chain rule**: Computes derivatives layer-by-layer using the chain rule from calculus
+2. **Reuses computations**: Forward pass activations are reused during backward pass
+3. **Local updates**: Each weight update only needs local information (adjacent layers)
+
+<Accordion title="Computational complexity">
+For one training example:
+
+- **Forward pass**: ~159,000 operations
+- **Backward pass**: ~318,000 operations (similar but computing gradients)
+- **Total**: ~477,000 operations per image
+
+With 60,000 images × 5 epochs = **143 billion operations** total for training.
+
+Despite this large number, training completes in minutes on modern hardware thanks to optimized matrix libraries.
+</Accordion>

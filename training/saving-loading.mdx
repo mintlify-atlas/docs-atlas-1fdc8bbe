@@ -1,0 +1,300 @@
+---
+title: Saving and loading models
+description: Learn how to save trained neural network weights to disk and load them for predictions without retraining.
+---
+
+The neural network saves trained weights to binary files for persistence. This allows you to train once and use the model multiple times without retraining.
+
+## Model files
+
+The network stores weights in two separate files:
+
+- **`data/hweights.model`**: Hidden layer weights (784 x 200 matrix)
+- **`data/oweights.model`**: Output layer weights (200 x 10 matrix)
+
+<Note>
+The `data` directory must exist before training. Create it manually if needed:
+```bash
+mkdir -p data
+```
+</Note>
+
+## Saving models
+
+Models are automatically saved after training completes. The save operation happens in cmd/main.go:34-36:
+
+```go
+case "train":
+    mnistTrain(&net)
+    save(net)
+```
+
+### Save implementation
+
+The save function serializes weight matrices to disk (cmd/main.go:128-139):
+
+```go
+func save(net perceptron.Network) {
+    h, err := os.Create("data/hweights.model")
+    defer h.Close()
+    if err == nil {
+        net.HiddenWeights.MarshalBinaryTo(h)
+    }
+    o, err := os.Create("data/oweights.model")
+    defer o.Close()
+    if err == nil {
+        net.OutputWeights.MarshalBinaryTo(o)
+    }
+}
+```
+
+### How it works
+
+<Steps>
+
+### Create files
+
+Open or create the model files in the `data` directory.
+
+### Serialize matrices
+
+Use Gonum's `MarshalBinaryTo` method to convert weight matrices to binary format.
+
+### Write to disk
+
+Save the binary data to the respective files.
+
+### Close files
+
+Automatically close file handles using `defer`.
+
+</Steps>
+
+<Note>
+The `MarshalBinaryTo` method is provided by the Gonum library's `mat.Dense` type. It efficiently serializes matrix data in a compact binary format.
+</Note>
+
+## Loading models
+
+Load previously trained weights before making predictions. The load operation happens automatically when using predict mode.
+
+### Load implementation
+
+The load function reads weight matrices from disk (cmd/main.go:142-156):
+
+```go
+func load(net *perceptron.Network) {
+    h, err := os.Open("data/hweights.model")
+    defer h.Close()
+    if err == nil {
+        net.HiddenWeights.Reset()
+        net.HiddenWeights.UnmarshalBinaryFrom(h)
+    }
+    o, err := os.Open("data/oweights.model")
+    defer o.Close()
+    if err == nil {
+        net.OutputWeights.Reset()
+        net.OutputWeights.UnmarshalBinaryFrom(o)
+    }
+    return
+}
+```
+
+### Loading process
+
+<Steps>
+
+### Open files
+
+Open the existing model files from the `data` directory.
+
+### Reset matrices
+
+Clear existing weight values in the network.
+
+### Deserialize data
+
+Use Gonum's `UnmarshalBinaryFrom` to reconstruct matrices from binary data.
+
+### Update network
+
+The network pointer is updated with the loaded weights.
+
+</Steps>
+
+<Warning>
+If model files don't exist, the load function silently fails. Always train the model first or ensure pre-trained weights are available before attempting predictions.
+</Warning>
+
+## CLI usage
+
+### Training and saving
+
+Train the model and automatically save weights:
+
+```bash
+go run cmd/main.go -mnist train
+```
+
+This command:
+1. Initializes a new network with random weights
+2. Trains on the MNIST dataset for 5 epochs
+3. Saves trained weights to `data/hweights.model` and `data/oweights.model`
+
+### Loading for predictions
+
+Load trained weights and evaluate on test set:
+
+```bash
+go run cmd/main.go -mnist predict
+```
+
+This command:
+1. Creates a network with default architecture
+2. Loads weights from saved model files
+3. Runs predictions on MNIST test data
+4. Displays accuracy score
+
+### Predicting single images
+
+Load weights and predict from a custom PNG image:
+
+<CodeGroup>
+
+```bash Basic usage
+go run cmd/main.go -file path/to/digit.png
+```
+
+```bash Example
+go run cmd/main.go -file samples/digit_3.png
+```
+
+</CodeGroup>
+
+This command:
+1. Loads the trained model weights
+2. Reads and preprocesses the PNG image
+3. Displays the image in the terminal (iTerm2 only)
+4. Outputs the predicted digit
+
+## File format details
+
+### Binary format
+
+The model files use Gonum's binary matrix format, which includes:
+
+- Matrix dimensions (rows, columns)
+- Matrix stride information
+- Raw float64 data values
+
+This format is:
+- **Compact**: Efficient binary storage
+- **Fast**: Quick serialization and deserialization
+- **Portable**: Works across different systems
+
+### File sizes
+
+Expected file sizes for the default architecture:
+
+- **hweights.model**: ~1.2 MB (784 x 200 = 156,800 float64 values)
+- **oweights.model**: ~16 KB (200 x 10 = 2,000 float64 values)
+
+<Note>
+Each float64 value occupies 8 bytes, plus small overhead for matrix metadata.
+</Note>
+
+## Model compatibility
+
+The saved weights are tied to the network architecture:
+
+- **Hidden weights**: Must match (hiddens x inputs) dimensions
+- **Output weights**: Must match (outputs x hiddens) dimensions
+
+<Warning>
+If you change the network architecture (e.g., increase hidden neurons from 200 to 300), existing model files become incompatible. You must retrain and save new weights.
+</Warning>
+
+### Architecture verification
+
+When loading, ensure the network is created with the same parameters:
+
+```go
+// This must match the architecture used during training
+net := perceptron.CreateNetwork(784, 200, 10, 0.1)
+```
+
+## Error handling
+
+The current implementation has minimal error handling:
+
+```go
+h, err := os.Open("data/hweights.model")
+if err == nil {
+    // Load weights
+}
+```
+
+If files don't exist:
+- **Save**: Creates new files
+- **Load**: Silently fails, network keeps random initialization
+
+<Warning>
+When using the network for predictions, always verify that model files exist and were loaded successfully. Predicting with untrained (random) weights will give meaningless results.
+</Warning>
+
+## Best practices
+
+### Version control
+
+Consider these practices for managing model files:
+
+- **Git ignore**: Add `data/*.model` to `.gitignore` to avoid committing large binary files
+- **Model versioning**: Add timestamps or version numbers to filenames (e.g., `hweights_v1.model`)
+- **Backup important models**: Keep copies of well-performing models
+
+### File organization
+
+```
+project/
+├── data/
+│   ├── hweights.model          # Current model
+│   ├── oweights.model          # Current model
+│   ├── hweights_backup.model   # Backup
+│   └── oweights_backup.model   # Backup
+├── mnist_dataset/
+│   ├── mnist_train.csv
+│   └── mnist_test.csv
+└── cmd/
+    └── main.go
+```
+
+## Extending the save/load system
+
+To enhance the model persistence:
+
+1. **Add metadata**: Store training parameters (learning rate, epochs, accuracy)
+2. **Version tracking**: Include version numbers for compatibility checks
+3. **Compression**: Use gzip to reduce file sizes
+4. **Error handling**: Add explicit error messages for missing files
+5. **Custom paths**: Accept model file paths as CLI arguments
+
+Example with custom paths:
+
+```go
+modelPath := flag.String("model", "data/weights", "Path prefix for model files")
+flag.Parse()
+// Save to: {modelPath}_hidden.model and {modelPath}_output.model
+```
+
+## Summary
+
+Key points for model persistence:
+
+- Models are saved as binary files in the `data` directory
+- Two files store hidden and output layer weights separately
+- Saving happens automatically after training
+- Loading is required before making predictions
+- Model files are architecture-specific
+- Ensure the `data` directory exists before training
+
+With model persistence, you can train once and use your 97% accurate MNIST classifier indefinitely without retraining.

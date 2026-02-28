@@ -1,0 +1,235 @@
+---
+title: Matrix operations
+description: Core matrix operations for neural network computations including dot product, element-wise operations, and transformations
+---
+
+This page documents the fundamental matrix operations used throughout the neural network implementation. These functions wrap the `gonum.org/v1/gonum/mat` library to provide clean, composable operations for forward and backward propagation.
+
+## dot
+
+Performs matrix multiplication (dot product) between two matrices.
+
+```go
+func dot(m, n mat.Matrix) mat.Matrix
+```
+
+<ParamField path="m" type="mat.Matrix" required>
+  The left matrix in the multiplication
+</ParamField>
+
+<ParamField path="n" type="mat.Matrix" required>
+  The right matrix in the multiplication
+</ParamField>
+
+<ParamField path="returns" type="mat.Matrix">
+  A new matrix containing the result of m × n with dimensions (m.rows × n.cols)
+</ParamField>
+
+### Usage in neural network
+
+The `dot` function is used extensively in forward propagation to compute layer inputs:
+
+<CodeGroup>
+```go Forward propagation
+// Hidden layer computation
+hiddenInputs := dot(net.HiddenWeights, inputs)
+
+// Output layer computation
+finalInputs := dot(net.OutputWeights, hiddenOutputs)
+```
+
+```go Backpropagation
+// Calculate hidden layer errors
+hiddenErrors := dot(net.OutputWeights.T(), outputErrors)
+
+// Update weights with gradient
+dot(multiply(outputErrors, sigmoidPrime(finalOutputs)), hiddenOutputs.T())
+```
+</CodeGroup>
+
+<Info>
+  Used in `perceptron.go:33`, `perceptron.go:35`, `perceptron.go:41`, `perceptron.go:46`, `perceptron.go:51`, `perceptron.go:58`, and `perceptron.go:60`
+</Info>
+
+## multiply
+
+Performs element-wise multiplication (Hadamard product) of two matrices.
+
+```go
+func multiply(m, n mat.Matrix) mat.Matrix
+```
+
+<ParamField path="m" type="mat.Matrix" required>
+  The first matrix (must have same dimensions as n)
+</ParamField>
+
+<ParamField path="n" type="mat.Matrix" required>
+  The second matrix (must have same dimensions as m)
+</ParamField>
+
+<ParamField path="returns" type="mat.Matrix">
+  A new matrix where each element [i,j] = m[i,j] × n[i,j]
+</ParamField>
+
+### Usage in neural network
+
+Critical for computing gradients during backpropagation by combining errors with activation derivatives:
+
+```go
+// Compute output layer gradient
+multiply(outputErrors, sigmoidPrime(finalOutputs))
+
+// Compute hidden layer gradient
+multiply(hiddenErrors, sigmoidPrime(hiddenOutputs))
+```
+
+<Info>
+  The element-wise multiplication is essential for applying the chain rule during backpropagation. Used in `perceptron.go:27`, `perceptron.go:46`, and `perceptron.go:51`
+</Info>
+
+## add
+
+Performs element-wise addition of two matrices.
+
+```go
+func add(m, n mat.Matrix) mat.Matrix
+```
+
+<ParamField path="m" type="mat.Matrix" required>
+  The first matrix (must have same dimensions as n)
+</ParamField>
+
+<ParamField path="n" type="mat.Matrix" required>
+  The second matrix (must have same dimensions as m)
+</ParamField>
+
+<ParamField path="returns" type="mat.Matrix">
+  A new matrix where each element [i,j] = m[i,j] + n[i,j]
+</ParamField>
+
+### Usage in neural network
+
+Used exclusively during weight updates to apply the computed gradients:
+
+```go
+// Update output layer weights
+net.OutputWeights = add(net.OutputWeights,
+    scale(net.learningRate,
+        dot(multiply(outputErrors, sigmoidPrime(finalOutputs)),
+            hiddenOutputs.T()))).(*mat.Dense)
+```
+
+<Info>
+  This implements the gradient descent update rule: w_new = w_old + learning_rate × gradient
+</Info>
+
+## subtract
+
+Performs element-wise subtraction of two matrices.
+
+```go
+func subtract(m, n mat.Matrix) mat.Matrix
+```
+
+<ParamField path="m" type="mat.Matrix" required>
+  The first matrix (minuend)
+</ParamField>
+
+<ParamField path="n" type="mat.Matrix" required>
+  The second matrix (subtrahend, must have same dimensions as m)
+</ParamField>
+
+<ParamField path="returns" type="mat.Matrix">
+  A new matrix where each element [i,j] = m[i,j] - n[i,j]
+</ParamField>
+
+### Usage in neural network
+
+Used to calculate prediction errors and in the sigmoid derivative:
+
+<CodeGroup>
+```go Error calculation
+// Calculate output error: target - prediction
+outputErrors := subtract(targets, finalOutputs)
+```
+
+```go Sigmoid derivative
+// Compute (1 - m) for sigmoid derivative
+subtract(ones, m)
+```
+</CodeGroup>
+
+<Info>
+  Error calculation is the first step in backpropagation. Used in `perceptron.go:27` and `perceptron.go:40`
+</Info>
+
+## scale
+
+Multiplies every element in a matrix by a scalar value.
+
+```go
+func scale(s float64, m mat.Matrix) mat.Matrix
+```
+
+<ParamField path="s" type="float64" required>
+  The scalar value to multiply each element by
+</ParamField>
+
+<ParamField path="m" type="mat.Matrix" required>
+  The matrix to scale
+</ParamField>
+
+<ParamField path="returns" type="mat.Matrix">
+  A new matrix where each element [i,j] = s × m[i,j]
+</ParamField>
+
+### Usage in neural network
+
+Applies the learning rate to gradients before updating weights:
+
+```go
+// Scale gradient by learning rate
+scale(net.learningRate,
+    dot(multiply(outputErrors, sigmoidPrime(finalOutputs)),
+        hiddenOutputs.T()))
+```
+
+<Info>
+  The learning rate controls how much the weights change with each training iteration. Smaller values (e.g., 0.1) lead to slower but more stable learning. Used in `perceptron.go:45` and `perceptron.go:50`
+</Info>
+
+## apply
+
+Applies a function to each element of a matrix.
+
+```go
+func apply(fn func(i, j int, v float64) float64, m mat.Matrix) mat.Matrix
+```
+
+<ParamField path="fn" type="func(i, j int, v float64) float64" required>
+  A function that takes row index, column index, and element value, returning a transformed value
+</ParamField>
+
+<ParamField path="m" type="mat.Matrix" required>
+  The matrix to apply the function to
+</ParamField>
+
+<ParamField path="returns" type="mat.Matrix">
+  A new matrix where each element [i,j] = fn(i, j, m[i,j])
+</ParamField>
+
+### Usage in neural network
+
+Primarily used to apply the sigmoid activation function to layer outputs:
+
+```go
+// Apply sigmoid activation to hidden layer
+hiddenOutputs := apply(sigmoid, hiddenInputs)
+
+// Apply sigmoid activation to output layer
+finalOutputs := apply(sigmoid, finalInputs)
+```
+
+<Info>
+  The sigmoid activation function introduces non-linearity, allowing the network to learn complex patterns. Used in `perceptron.go:34`, `perceptron.go:36`, `perceptron.go:59`, and `perceptron.go:61`
+</Info>
