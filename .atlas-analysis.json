@@ -1,0 +1,63 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Go Neural Network",
+  "projectDescription": "A neural network implementation from scratch in Go for MNIST handwritten digit classification with 97% accuracy.",
+  "theme": "aspen",
+  "primaryColor": "#00ADD8",
+  "lightColor": "#5DC9E2",
+  "darkColor": "#00758D",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["introduction", "installation", "quickstart"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": ["concepts/neural-networks", "concepts/mnist-dataset", "concepts/forward-propagation", "concepts/backpropagation"]
+          },
+          {
+            "group": "Training Guide",
+            "pages": ["training/preparing-data", "training/training-model", "training/saving-loading"]
+          },
+          {
+            "group": "Inference",
+            "pages": ["inference/making-predictions", "inference/custom-images"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Network",
+            "pages": ["api/network/create-network", "api/network/train", "api/network/predict"]
+          },
+          {
+            "group": "Matrix Operations",
+            "pages": ["api/matrix/operations", "api/matrix/utilities"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Neural network built from scratch in Go",
+    "MNIST handwritten digit classification",
+    "97% accuracy on test dataset",
+    "Forward and backward propagation implementation",
+    "Model persistence (save/load trained weights)",
+    "Custom image prediction support"
+  ],
+  "publicApiSurface": [
+    "CreateNetwork(input, hidden, output int, rate float64) Network",
+    "Network.Train(inputData []float64, targetData []float64)",
+    "Network.Predict(inputData []float64) mat.Matrix",
+    "Network.HiddenWeights",
+    "Network.OutputWeights",
+    "MatrixPrint(X mat.Matrix)"
+  ]
+}
